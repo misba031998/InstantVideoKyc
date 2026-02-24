@@ -54,7 +54,7 @@ webSocket.on("request", (req) => {
               WHERE UserId = @Username
             `);
         }
-       console.log("store_user ",data.name)
+        console.log("store_user ", data.name)
         break;
 
       // ==============================
@@ -72,7 +72,8 @@ webSocket.on("request", (req) => {
         }
 
         await pool.request()
-          .input("Username", sql.NVarChar, agent.Username)
+          //.input("Username", sql.NVarChar, agent.Username)
+          .input("Username", sql.NVarChar, agent.UserId)
           .query(`
             UPDATE USER_Master
             SET IsAvailable = 0
@@ -80,15 +81,30 @@ webSocket.on("request", (req) => {
           `);
 
         // notify agent
-        connections[agent.Username].send(JSON.stringify({
-          type: "incoming_call",
-          userId: data.userId
-        }));
+        // connections[agent.Username].send(JSON.stringify({
+        //   type: "incoming_call",
+        //   userId: data.userId
+        // }));
+
+        // notify agent safely
+        if (connections[agent.UserId]) {
+          connections[agent.UserId].send(JSON.stringify({
+            type: "incoming_call",
+            userId: data.userId
+          }));
+        } else {
+          console.log("Agent socket not found:", agent.UserId);
+        }
 
         // notify user
+        // connection.send(JSON.stringify({
+        //   type: "agent_assigned",
+        //   agentName: agent.Username
+        // }));
+
         connection.send(JSON.stringify({
           type: "agent_assigned",
-          agentName: agent.Username
+          agentName: agent.UserId
         }));
 
         break;
@@ -133,17 +149,44 @@ webSocket.on("request", (req) => {
       // ==============================
       // CALL ENDED
       // ==============================
+
       case "call_ended":
 
+        // Only agent is allowed to end call
+        // So data.name = agent
+        const agentId = data.name;
+        const memberId = data.target;
+
+        console.log("Call ended by agent:", agentId);
+
+        // Make agent available again
         await pool.request()
-          .input("Username", sql.NVarChar, data.agentName)
+          .input("Username", sql.NVarChar, agentId)
           .query(`
-            UPDATE USER_Master
-            SET IsAvailable = 1
-            WHERE UserId = @Username
-          `);
+      UPDATE USER_Master
+      SET IsAvailable = 1
+      WHERE UserId = @Username
+    `);
+
+        // Notify member that call ended
+        if (connections[memberId]) {
+          connections[memberId].send(JSON.stringify({
+            type: "call_ended"
+          }));
+        }
 
         break;
+      // case "call_ended":
+
+      //   await pool.request()
+      //     .input("Username", sql.NVarChar, data.agentName)
+      //     .query(`
+      //       UPDATE USER_Master
+      //       SET IsAvailable = 1
+      //       WHERE UserId = @Username
+      //     `);
+
+      //   break;
     }
   });
 
