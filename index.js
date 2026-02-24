@@ -1,7 +1,8 @@
 require("dotenv").config();
 const http = require("http");
 const { server: WebSocketServer } = require("websocket");
-const { sql, pool } = require("./db");
+const { sql, pool, poolConnect } = require("./db");
+//const { sql, pool } = require("./db");
 
 // const server = http.createServer(() => {});
 // server.listen(8000);
@@ -46,14 +47,14 @@ webSocket.on("request", (req) => {
 
         if (data.role === "agent") {
           await pool.request()
-            .input("UserId", sql.NVarChar, data.name)
+            .input("Username", sql.NVarChar, data.name)
             .query(`
               UPDATE USER_Master
               SET IsOnline = 1, IsAvailable = 1
               WHERE UserId = @Username
             `);
         }
-
+       console.log("store_user ",data.name)
         break;
 
       // ==============================
@@ -71,7 +72,7 @@ webSocket.on("request", (req) => {
         }
 
         await pool.request()
-          .input("UserId", sql.NVarChar, agent.Username)
+          .input("Username", sql.NVarChar, agent.Username)
           .query(`
             UPDATE USER_Master
             SET IsAvailable = 0
@@ -135,7 +136,7 @@ webSocket.on("request", (req) => {
       case "call_ended":
 
         await pool.request()
-          .input("UserId", sql.NVarChar, data.agentName)
+          .input("Username", sql.NVarChar, data.agentName)
           .query(`
             UPDATE USER_Master
             SET IsAvailable = 1
@@ -152,7 +153,7 @@ webSocket.on("request", (req) => {
         delete connections[key];
 
         await pool.request()
-          .input("UserId", sql.NVarChar, key)
+          .input("Username", sql.NVarChar, key)
           .query(`
             UPDATE USER_Master
             SET IsOnline = 0, IsAvailable = 0
